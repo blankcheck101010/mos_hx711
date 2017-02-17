@@ -1,0 +1,37 @@
+{
+  "debug": {
+    "enable_prompt": true,
+    "factory_reset_gpio": 25,
+    "level": 2,
+    "mbedtls_level": 0,
+    "stderr_uart": 0,
+    "stdout_uart": 0
+  },
+  "mqtt": {
+    "server": "a3435kvnt0ktq7.iot.us-west-2.amazonaws.com:8883",
+    "user": "",
+    "pass": "",
+    "reconnect_timeout_min": 10,
+    "reconnect_timeout_max": 60,
+    "ssl_cert": "aws-iot-c2d93a8d8c.crt.pem",
+    "ssl_key": "aws-iot-c2d93a8d8c.key.pem",
+    "ssl_ca_cert": "ca-verisign-ecc-g2.crt.pem",
+    "clean_session": true,
+    "keep_alive": 60,
+    "will_topic": "",
+    "will_message": "",
+    "pub": "bb",
+    "sub": "aa"
+  },
+  "wifi": {
+    "sta": {
+      "enable": false
+    },
+    "ap": {
+      "enable": true,
+      "pass": "beinprow",
+      "ssid": "inProw_??????",
+      "keep_enabled": true
+    }
+  }
+}

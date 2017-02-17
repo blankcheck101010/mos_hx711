@@ -1,0 +1,16 @@
+name: c_myapp
+# arch: PLATFORM
+version: 1.0
+skeleton_version: 2016-09-20
+sources:
+  - src
+filesystem:
+  - fs
+build_vars:
+  MGOS_ENABLE_MQTT: 1
+  MGOS_ENABLE_ATCA_SERVICE: 1
+  MGOS_ENABLE_WEB_CONFIG: 1
+  MGOS_ENABLE_FILE_UPLOAD: 1
+  MGOS_ENABLE_GPIO_API: 1
+  SSL: mbedTLS
+  APP_CONF_SCHEMA: src/conf_schema.yaml

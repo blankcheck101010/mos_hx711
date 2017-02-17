@@ -1,0 +1,368 @@
+/opt/Espressif/esp-idf/make/project.mk:172: warning: undefined variable 'CONFIG_SECURE_BOOT_ENABLED'
+/opt/Espressif/esp-idf/make/project.mk:234: warning: undefined variable 'CONFIG_OPTIMIZATION_LEVEL_RELEASE'
+/opt/Espressif/esp-idf/make/project.mk:258: warning: undefined variable 'CXXFLAGS'
+/opt/Espressif/esp-idf/make/project.mk:274: warning: undefined variable 'OBJCOPY'
+/opt/Espressif/esp-idf/make/project.mk:275: warning: undefined variable 'SIZE'
+/opt/Espressif/esp-idf/make/project.mk:280: warning: undefined variable 'CONFIG_TOOLPREFIX'
+/opt/Espressif/esp-idf/make/project.mk:281: warning: undefined variable 'CONFIG_TOOLPREFIX'
+/opt/Espressif/esp-idf/make/project.mk:282: warning: undefined variable 'CONFIG_TOOLPREFIX'
+/opt/Espressif/esp-idf/make/project.mk:283: warning: undefined variable 'CONFIG_TOOLPREFIX'
+/opt/Espressif/esp-idf/make/project.mk:284: warning: undefined variable 'CONFIG_TOOLPREFIX'
+/opt/Espressif/esp-idf/make/project.mk:285: warning: undefined variable 'CONFIG_TOOLPREFIX'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:15: warning: undefined variable 'CONFIG_PYTHON'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:16: warning: undefined variable 'CONFIG_ESPTOOLPY_PORT'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:16: warning: undefined variable 'CONFIG_ESPTOOLPY_BEFORE'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:16: warning: undefined variable 'CONFIG_ESPTOOLPY_AFTER'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:19: warning: undefined variable 'CONFIG_PYTHON'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:20: warning: undefined variable 'CONFIG_PYTHON'
+/opt/Espressif/esp-idf/components/esptool_py/Makefile.projbuild:23: warning: undefined variable 'CONFIG_ESPTOOLPY_FLASHFREQ'
+/opt/Espressif/esp-idf/components/partition_table/Makefile.projbuild:12: warning: undefined variable 'CONFIG_PYTHON'
+/opt/Espressif/esp-idf/make/project.mk:329: warning: undefined variable 'CONFIG_SECURE_BOOT_ENABLED'
+/opt/Espressif/esp-idf/make/project.mk:329: warning: undefined variable 'CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES'
+GENCONFIG
+/mongoose-os/fw/platforms/esp32/sdkconfig:85:warning: symbol value '' invalid for PHY_DATA_OFFSET
+#
+# configuration written to /mongoose-os/fw/platforms/esp32/sdkconfig
+#
+/opt/Espressif/esp-idf/make/project.mk:258: warning: undefined variable 'CXXFLAGS'
+/opt/Espressif/esp-idf/make/project.mk:274: warning: undefined variable 'OBJCOPY'
+/opt/Espressif/esp-idf/make/project.mk:275: warning: undefined variable 'SIZE'
+Building partitions from /mongoose-os/fw/platforms/esp32/src/partitions_mgos.csv...
+CC esp_ota_ops.o
+CC spi_master.o
+CC ledc.o
+CC src/esp_ota_select.o
+/mongoose-os/fw/platforms/esp32/Makefile.build:145: warning: undefined variable 'BUILD_INFO_C'
+/mongoose-os/fw/platforms/esp32/Makefile.build:145: warning: undefined variable 'BUILD_INFO_C'
+CC emac_main.o
+/mongoose-os/fw/platforms/esp32/Makefile.build:145: warning: undefined variable 'BUILD_INFO_C'
+CC log.o
+CC gdbstub.o
+CC rmt.o
+CC timer.o
+CC sigmadelta.o
+CC uart.o
+CC time.o
+CC rtc_module.o
+  MKDIR /app/build/gen 
+CC xtensa_intr.o
+CC sdmmc_transaction.o
+CC src/flash_encrypt.o
+CC i2c.o
+  MKDIR /app/build/objs/fw_temp 
+CC task_wdt.o
+CC cpu_util.o
+CC sdmmc_host.o
+CC panic.o
+CC vfs.o
+CC periph_ctrl.o
+CC heap_regions_debug.o
+CC syscalls.o
+CC queue.o
+CC vfs_uart.o
+CC emac_dev.o
+CC src/bootloader_random.o
+CC ringbuf.o
+  GCC   /app/build/objs/mkspiffs
+CC deep_sleep.o
+CC syscall_table.o
+CC int_wdt.o
+CC brownout.o
+CC event_default_handlers.o
+CC phy_init.o
+CC src/esp_image_format.o
+CC xtensa_init.o
+CC cache_utils.o
+CC system_api.o
+CC locks.o
+CC event_loop.o
+CC list.o
+CC flash_ops.o
+CC cpu_start.o
+CC micro-ecc/uECC.o
+CXX src/nvs_types.o
+CC tasks.o
+CC intr_alloc.o
+CC src/bootloader_flash.o
+CC eri.o
+CC gpio.o
+CC lib_printf.o
+CC croutine.o
+CC src/secure_boot_signatures.o
+CC pcnt.o
+CC lib/atca_device.o
+  MKDIR /app/build/fw 
+AS xtensa_context.o
+CC flash_mmap.o
+CC lib/basic/atca_helpers.o
+CC src/flash_partitions.o
+CC library/xmlrole.o
+CC hw_random.o
+CC freertos_hooks.o
+CXX src/nvs_pagemanager.o
+CXX src/nvs_item_hash_list.o
+CXX src/nvs_page.o
+CC src/secure_boot.o
+CC library/xmltok_impl.o
+CC core/ipv4/igmp.o
+CC i2s.o
+CC reent_init.o
+CC core_dump.o
+CXX src/nvs_api.o
+AS xtensa_vectors.o
+CC lib/basic/atca_basic.o
+CC ipc.o
+CC core/ipv4/ip_frag.o
+AS portasm.o
+CC partition.o
+CC core/ipv4/ip4.o
+CC trax.o
+CC cpu_freq.o
+CC lib/atca_command.o
+CC heap_alloc_caps.o
+CC crosscore_int.o
+CC src/efuse.o
+CC port/minicheck.o
+CC port/chardata.o
+CC spiffs_nucleus.o
+CC lib/host/atca_host.o
+CC lib/atca_iface.o
+CC port/expat_element.o
+CC spiffs_check.o
+  GEN   /app/build/gen/sys_config.c
+CC core/ipv4/icmp.o
+CC spi_flash_rom_patch.o
+CXX src/nvs_storage.o
+CC spiffs_hydrogen.o
+CC timers.o
+CC heap_regions.o
+CC lib/atca_cfgs.o
+CC FreeRTOS-openocd.o
+CC tcpip_adapter_lwip.o
+AS xtensa_intr_asm.o
+CC library/xmltok_ns.o
+CC api/tcpip.o
+CC hwcrypto/sha.o
+CC hwcrypto/aes.o
+CC library/xmlparse.o
+CC netif/lowpan6.o
+CC port.o
+CC library/xmltok.o
+CC event_groups.o
+CC spiffs_vfs.o
+CC api/pppapi.o
+CC api/netbuf.o
+CC api/api_lib.o
+CC api/netdb.o
+CC core/ipv4/autoip.o
+CC api/netifapi.o
+  GEN   /app/build/gen/sys_ro_vars.c
+CC xtensa_overlay_os_hook.o
+CC apps/ping/esp_ping.o
+CC apps/ping/ping.o
+CC netif/ethernetif.o
+CC netif/slipif.o
+CC api/err.o
+CC core/dns.o
+CC netif/etharp.o
+CC netif/ethernet.o
+CC spiffs_gc.o
+CC src/crypto/sha1-internal.o
+CC spiffs_cache.o
+CC core/ipv4/ip4_addr.o
+CC core/ipv4/dhcp.o
+CC src/crypto/aes-internal-enc.o
+CC api/sockets.o
+CC src/crypto/aes-internal.o
+CC src/crypto/aes-wrap.o
+CC src/crypto/des-internal.o
+CC core/ipv6/icmp6.o
+CC src/crypto/ms_funcs.o
+CC core/ipv6/ethip6.o
+CC src/crypto/dh_groups.o
+CC src/crypto/md5-internal.o
+CC core/tcp_in.o
+CC src/crypto/crypto_internal-rsa.o
+CC core/stats.o
+CC src/crypto/aes-unwrap.o
+CC core/inet_chksum.o
+CC src/crypto/sha256-internal.o
+CC api/api_msg.o
+CC core/init.o
+CC src/crypto/aes-internal-dec.o
+CC src/crypto/sha1.o
+CC core/mem.o
+CC apps/dhcpserver.o
+CC port/os_xtensa.o
+CC core/memp.o
+CC core/ipv6/mld6.o
+CC core/ipv6/inet6.o
+CC src/crypto/bignum.o
+CC core/timers.o
+CC src/crypto/sha256.o
+CC apps/sntp/sntp.o
+CC src/crypto/md5.o
+CC core/raw.o
+CC src/crypto/dh_group5.o
+CC core/ipv6/ip6_addr.o
+CC core/def.o
+CC core/tcp.o
+CC port/netif/ethernetif.o
+CC api/lwip_debug.o
+CC core/udp.o
+CC src/crypto/md4-internal.o
+CC src/crypto/crypto_internal-cipher.o
+CC core/pbuf.o
+CC core/ip.o
+CC port/netif/wlanif.o
+CC src/crypto/rc4.o
+CC src/crypto/crypto_internal-modexp.o
+CC port/freertos/sys_arch.o
+CC src/crypto/crypto_internal.o
+CC core/netif.o
+CC src/crypto/aes-cbc.o
+CC src/crypto/sha1-pbkdf2.o
+CC core/ipv6/ip6.o
+CC core/ipv6/nd6.o
+CC core/ipv6/dhcp6.o
+CC core/tcp_out.o
+CC core/sys.o
+CC core/ipv6/ip6_frag.o
+AR libxtensa-debug-module.a
+AR libnewlib.a
+AR libapp_update.a
+AR liblog.a
+AR libbootloader_support.a
+AR libspi_flash.a
+AR libvfs.a
+AR libesp32.a
+CC esp32_crypto.o
+CC esp32_hal.o
+CC mgos_utils.o
+CC mgos_rpc.o
+CC mgos_uart.o
+CC esp32_console.o
+CC esp32_fs.o
+CC esp32_mdns.o
+CC mgos_dlsym.o
+CC mgos_mdns.o
+CC mg_rpc_channel_http.o
+CC mgos_rpc_channel_mqtt.o
+CC mgos_rpc_channel_uart.o
+CC mgos_timers_mongoose.o
+CC esp32_fs_crypt.o
+CC mg_rpc_channel_ws.o
+CC mgos_atca_service.o
+CC mg_rpc.o
+CC mgos_atca.o
+CC esp32_gpio.o
+CC json_utils.o
+CC esp32_main.o
+CC mgos_service_vars.o
+CC cs_file.o
+CC mgos_gpio_service.o
+CC frozen.o
+CC cs_rbuf.o
+CC mgos_i2c_service.o
+CC mgos_service_config.o
+CC mongoose.o
+CC mgos_service_filesystem.o
+CC main.o
+CC mgos_config.o
+CC esp32_uart.o
+CC mgos_i2c.o
+CC mgos_sys_config.o
+CC mgos_mongoose.o
+CC mgos_init.o
+CC mgos_dns_sd.o
+CC mgos_gpio.o
+CC /app/build/gen/sys_config.o
+CC mgos_mqtt.o
+CC mgos_updater_rpc.o
+CC cs_dbg.o
+CC esp32_updater.o
+CC esp32_wifi.o
+CC cs_crc32.o
+CC mgos_updater_common.o
+CC mgos_updater_http.o
+CC mgos_wifi.o
+CC mgos_i2c_gpio.o
+CC sys_ro_vars.o
+AR libethernet.a
+AR libtcpip_adapter.a
+CC bootloader_start.o
+CC spi_flash_rom_patch.o
+CC src/bootloader_random.o
+CC src/esp_ota_select.o
+CC src/secure_boot.o
+CC src/efuse.o
+CC log.o
+CC src/bootloader_flash.o
+CC src/secure_boot_signatures.o
+CC src/flash_partitions.o
+CC src/flash_encrypt.o
+CC micro-ecc/uECC.o
+CC src/esp_image_format.o
+AR libspi_flash.a
+AR liblog.a
+AR libcryptoauthlib.a
+AR libdriver.a
+AR libfreertos.a
+AR libmain.a
+AR libwpa_supplicant.a
+AR libbootloader_support.a
+AR libmicro-ecc.a
+AR libspiffs.a
+AR liblwip.a
+AR libnvs_flash.a
+AR libmicro-ecc.a
+LD bootloader.elf
+esptool.py v2.0-beta1
+AR libexpat.a
+  GEN   /app/build/gen/symbols_dump.txt
+  GEN   /app/build/gen/build_info.c
+  GEN   /app/build/gen/mg_build_info.c
+  GEN   /app/build/gen/symbols_dump.txt > /app/build/gen/ffi_exports.c
+App version not specified and could not be guessed (BadObject: 39cb2ad1c7924fcc7914b12f082cf711f885ab94)
+Build ID not specified and could not be guessed (/app/build/objs/src doesn't look like a Git repo)
+CC build_info.o
+CC /app/build/objs/ffi_exports.o /app/build/gen/ffi_exports.c
+Build ID not specified and could not be guessed (BadObject: 39cb2ad1c7924fcc7914b12f082cf711f885ab94)
+CC mg_build_info.o
+AR libsrc.a
+LD c_myapp.elf
+esptool.py v2.0-beta1
+  CP    /mongoose-os/fw/skeleton/fs/index.html -> build/fs
+  CP    /mongoose-os/fw/skeleton/fs/example.txt -> build/fs
+  CP    /app/fs/conflib.js -> build/fs
+  CP    /app/fs/aws-iot-c2d93a8d8c.crt.pem -> build/fs
+  CP    /app/fs/conf_vendor.json -> build/fs
+  CP    /app/fs/ca-verisign-ecc-g2.crt.pem -> build/fs
+  CP    /app/fs/index.html -> build/fs
+  CP    /app/fs/aws-iot-c2d93a8d8c.key.pem -> build/fs
+  CP    /app/fs/readme.txt -> build/fs
+  CP    /app/build/gen/sys_config_schema.json -> build/fs
+  CP    /app/build/gen/sys_ro_vars_schema.json -> build/fs
+  CP    /app/build/gen/conf_defaults.json -> build/fs
+  MKFS  build/fs (131072) -> /app/build/objs/fw_temp/fs.img
+     Adding conf_defaults.json: 2457
+     Adding sys_ro_vars_schema.json: 332
+     Adding sys_config_schema.json: 6731
+     Adding readme.txt: 36
+     Adding aws-iot-c2d93a8d8c.key.pem: 227
+     Adding ca-verisign-ecc-g2.crt.pem: 1589
+     Adding conf_vendor.json: 791
+     Adding aws-iot-c2d93a8d8c.crt.pem: 1129
+     Adding conflib.js: 6311
+     Adding example.txt: 113
+     Adding index.html: 7075
+     Image stats: size=131072, space: total=113201, used=31124, free=82077
+  GEN    /app/build/objs/fw_temp/manifest.json
+  ZIP    /app/build/fw/c_myapp-esp32-last.zip
+     Adding /app/build/objs/fw_temp/bootloader.bin
+     Adding /app/build/objs/fw_temp/c_myapp.bin
+     Adding /app/build/objs/fw_temp/fs.img
+     Adding /app/build/objs/fw_temp/partitions_mgos.bin
+  Built c_myapp/esp32 version 1.0 (20170211-072554/???)
+To flash all build output, run 'make flash' or:
+python /opt/Espressif/esp-idf/components/esptool_py/esptool/esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 1500000 --before default_reset --after hard_reset write_flash -z --flash_mode qio --flash_freq 40m --flash_size detect 0x1000 /app/build/objs/bootloader/bootloader.bin 0x10000 /app/build/objs/c_myapp.bin 0x8000 /app/build/objs/partitions_mgos.bin
