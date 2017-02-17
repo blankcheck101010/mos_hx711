@@ -1,0 +1,165 @@
+MAKEFLAGS += --warn-undefined-variables --silent
+.DEFAULT_GOAL := all
+
+APP ?= mongoose-os
+APP_PLATFORM = esp32
+APP_MODULES ?=
+APP_CFLAGS ?=
+APP_CONF_SCHEMA ?=
+APP_FS_PATH ?=
+APP_EXTRA_SRCS ?=
+APP_VERSION ?=
+APP_BUILD_ID ?=
+FFI_SYMBOLS ?=
+
+MGOS_ENABLE_ATCA ?= 1
+MGOS_ESP32_ENABLE_FLASH_ENCRYPTION ?= 0
+
+MGOS_PATH ?= ../../..
+COMMON_PATH ?= $(MGOS_PATH)/common
+SPIFFS_PATH ?= $(COMMON_PATH)/spiffs
+MGOS_ESP_PATH ?= $(MGOS_PATH)/fw/platforms/esp32
+MGOS_ESP_SRC_PATH ?= $(MGOS_PATH)/fw/platforms/esp32/src
+COMMON_FS_PATH ?= $(MGOS_PATH)/fw/skeleton/fs
+
+BUILD_DIR ?= $(CURDIR)/.build
+FS_STAGING_DIR = $(BUILD_DIR)/fs
+FW_STAGING_DIR ?= $(BUILD_DIR)/fw_temp
+FW_DIR ?= $(CURDIR)/firmware
+GEN_DIR ?= $(BUILD_DIR)/gen
+
+FS_IMG = $(FW_STAGING_DIR)/fs.img
+# Keep in sync with partitions_mgos.csv
+FS_ADDR = 0x110000
+FS_SIZE = 131072
+FS_BLOCK_SIZE = 4096
+FS_PAGE_SIZE = 256
+FS_ERASE_SIZE = 4096
+NVS_ADDR = 0x9000
+NVS_SIZE = 0x4000
+OTA_DATA_ADDR = 0xd000
+OTA_DATA_SIZE = 0x2000
+
+# Absolutize all paths which can be given by the caller
+override APP_MODULES := $(abspath $(APP_MODULES))
+override APP_CONF_SCHEMA := $(abspath $(APP_CONF_SCHEMA))
+override APP_EXTRA_SRCS := $(abspath $(APP_EXTRA_SRCS))
+override APP_FS_PATH := $(abspath $(APP_FS_PATH))
+override BUILD_DIR := $(abspath $(BUILD_DIR))
+override FW_STAGING_DIR := $(abspath $(FW_STAGING_DIR))
+override FW_DIR := $(abspath $(FW_DIR))
+override GEN_DIR := $(abspath $(GEN_DIR))
+override MGOS_PATH := $(abspath $(MGOS_PATH))
+override _MGOS_PATH = $(MGOS_PATH)
+# It seems to be impossible to override vars passed to submake from the
+# command line, so we pass them via a separate set of varoables, which
+# submake then uses to override the values it received.
+export APP_BUILD_ID
+export _APP_CONF_SCHEMA = $(APP_CONF_SCHEMA)
+export _APP_EXTRA_SRCS = $(APP_EXTRA_SRCS)
+export _APP_FS_PATH = $(APP_FS_PATH)
+export _APP_MODULES = $(APP_MODULES)
+export APP_VERSION
+export _BUILD_DIR = $(BUILD_DIR)
+export FFI_SYMBOLS
+export _FW_DIR := $(FW_DIR)
+export _GEN_DIR := $(GEN_DIR)
+export MGOS_ENABLE_ATCA
+export MGOS_ESP_PATH
+export MGOS_ESP_SRC_PATH
+export _MGOS_PATH
+export SPIFFS_PATH
+
+export BUILD_INFO_JSON = $(GEN_DIR)/build_info.json
+
+CFLAGS += -DMGOS_APP=\"$(APP)\" -DCS_SPIFFS_ENABLE_VFS -I$(MGOS_PATH) \
+          -DFW_ARCHITECTURE=$(APP_PLATFORM) \
+          -DIRAM='__attribute__((section(".iram1")))' \
+          $(APP_CFLAGS)
+
+# Settings for the ESP-IDF build system
+# See docs here:
+#   https://github.com/espressif/esp-idf/blob/master/docs/build_system.rst
+
+PROJECT_NAME = $(APP)
+BUILD_DIR_BASE = $(BUILD_DIR)
+
+SRCDIRS = $(MGOS_ESP_PATH)/src
+# Explicitly specify SDK components to build. Notably, we do not build BT.
+COMPONENT_DIRS = $(COMMON_PATH) $(MGOS_PATH)/third_party /opt $(MGOS_ESP_PATH) $(IDF_PATH)/components
+SDK_COMPONENTS = app_update bootloader bootloader_support driver esp32 esptool_py \
+                 ethernet expat freertos log lwip micro-ecc newlib \
+                 nvs_flash partition_table spi_flash tcpip_adapter vfs \
+                 wpa_supplicant xtensa-debug-module
+COMPONENTS = $(SDK_COMPONENTS) cryptoauthlib cs_mbedtls spiffs
+
+# CONFIG_BT_RESERVE_DRAM is used when generating linker script and is not
+# defined when bt is not built.
+CPPFLAGS += -DCONFIG_BT_RESERVE_DRAM=0
+
+ESPFLASHMODE = qio
+ESPFLASHSIZE = 4MB
+ESPBAUD = 1500000
+
+SDKCONFIG = $(MGOS_ESP_PATH)/sdkconfig
+
+ifeq "$(MGOS_ESP32_ENABLE_FLASH_ENCRYPTION)" "1"
+override CONFIG_FLASH_ENCRYPTION_ENABLED = y
+ENCRYPT = true
+MKSPIFFS_CFLAGS = -DMGOS_ESP32_ENABLE_FLASH_ENCRYPTION=1
+MKSPIFFS = $(BUILD_DIR)/mkspiffs8
+PARTITION_TABLE_CSV_PATH = $(MGOS_ESP_PATH)/src/partitions_mgos_encrypted.csv
+else
+ENCRYPT = false
+MKSPIFFS_CFLAGS = -DMGOS_ESP32_ENABLE_FLASH_ENCRYPTION=0
+MKSPIFFS = $(BUILD_DIR)/mkspiffs
+PARTITION_TABLE_CSV_PATH = $(MGOS_ESP_PATH)/src/partitions_mgos.csv
+endif
+
+include $(IDF_PATH)/make/project.mk
+
+CFLAGS += $(MKSPIFFS_CFLAGS)
+
+LDFLAGS += -L$(BUILD_DIR)/src
+
+include $(MGOS_PATH)/fw/common.mk
+
+FW_PARTS = boot:type=boot,addr=0x1000,src=$(BOOTLOADER_BIN),encrypt=$(ENCRYPT) \
+           pt:type=pt,addr=$(PARTITION_TABLE_OFFSET),src=$(PARTITION_TABLE_BIN),encrypt=$(ENCRYPT) \
+           nvs:type=nvs,addr=$(NVS_ADDR),size=$(NVS_SIZE),fill=0xff \
+           otadata:type=otadata,addr=$(OTA_DATA_ADDR),fill=0xff,size=0x2000,encrypt=$(ENCRYPT) \
+           app:type=app,addr=$(CONFIG_APP_OFFSET),src=$(APP_BIN),encrypt=$(ENCRYPT) \
+           fs:src=$(FS_IMG),type=fs,addr=$(FS_ADDR),fs_size=$(FS_SIZE),fs_block_size=$(FS_BLOCK_SIZE),fs_page_size=$(FS_PAGE_SIZE),fs_erase_size=$(FS_ERASE_SIZE)
+
+include $(MGOS_PATH)/common/scripts/fw_meta.mk
+include $(MGOS_PATH)/fw/src/spiffs.mk
+
+all: $(FW_STAGING_DIR) $(FW_DIR) $(GEN_DIR) $(FW_ZIP)
+
+FS_FILES += $(GEN_DIR)/sys_config_schema.json $(GEN_DIR)/sys_ro_vars_schema.json
+
+# Put defaults on the filesystem under the old name, for compatibility.
+FS_FILES += $(GEN_DIR)/conf_defaults.json
+
+$(FW_DIR) $(FW_STAGING_DIR) $(GEN_DIR):
+	$(vecho) "MKDIR $@ $(BUILD_INFO_C)"
+	$(Q) mkdir -p $@
+
+$(FW_MANIFEST): $(APP_BIN) $(BOOTLOADER_BIN) $(PARTITION_TABLE_BIN) $(FS_IMG)
+
+$(GEN_DIR)/conf_defaults.json: $(GEN_DIR)/sys_config_defaults.json
+	$(Q) cp $< $@
+
+# sys_config is generated during binary build
+$(GEN_DIR)/sys_config_defaults.json $(GEN_DIR)/sys_config_schema.json $(GEN_DIR)/sys_ro_vars_schema.json: all_binaries
+
+$(FS_IMG): $(MKSPIFFS) $(APP_FS_PATH) $(COMMON_FS_PATH) $(FS_FILES)
+	$(call mkspiffs,$(FS_SIZE))
+
+SPIFFS_SRCS = $(SPIFFS_PATH)/*.c $(SPIFFS_PATH)/tools/mem_spiffs.c $(SPIFFS_PATH)/tools/mkspiffs.c
+$(MKSPIFFS): $(SPIFFS_SRCS) $(SPIFFS_PATH)/*.h
+	$(vecho) "GCC   $@"
+	$(Q) gcc -Wall -Werror -I$(MGOS_ESP_PATH)/include -I$(SPIFFS_PATH) $(MKSPIFFS_CFLAGS) -o $@ $(SPIFFS_SRCS)
+
+clean:
+	rm -rf $(BUILD_DIR) $(FW_DIR)

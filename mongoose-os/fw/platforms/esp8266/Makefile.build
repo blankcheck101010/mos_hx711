@@ -1,0 +1,440 @@
+# -*- mode: makefile -*-
+#
+# Mongoose OS for ESP8266
+#
+# GC_DEBUG: if "true" (default) enables string ASN checks
+# STACK_GUARD: if "true" (default) enables soft stack guard
+# SSL: chooses SSL library to use. Currently onle "mbedTLS" is supported
+# HEAP_LOG: if "1", compiles ESP firmware with heap logging feature: there are
+#           logging wrappers for malloc and friends. You can later view heap
+#           map by `tools/heaplog_viewer/heaplog_viewer.html`
+#
+MAKEFLAGS += --warn-undefined-variables
+.DEFAULT_GOAL := all
+
+APP ?= mongoose-os
+APP_PLATFORM = esp8266
+APP_MODULES ?=
+APP_CFLAGS ?=
+APP_FS_PATH ?=
+APP_EXTRA_SRCS ?=
+FFI_SYMBOLS ?=
+
+MGOS_DEBUG_UART = 0
+
+MGOS_PATH ?= ../../..
+COMMON_PATH ?= $(MGOS_PATH)/common
+MONGOOSE_PATH ?= $(MGOS_PATH)/mongoose
+FROZEN_PATH ?= $(MGOS_PATH)/frozen
+
+COMMON_ESP_PATH ?= $(COMMON_PATH)/platforms/esp8266
+MGOS_ESP_PATH ?= $(MGOS_PATH)/fw/platforms/esp8266
+MGOS_SRC_PATH ?= $(MGOS_PATH)/fw/src
+MBEDTLS_PATH ?= /opt/mbedtls
+SPIFFS_PATH ?= $(COMMON_PATH)/spiffs
+UMM_MALLOC_PATH ?= $(COMMON_PATH)/umm_malloc
+COMMON_FS_PATH ?= $(MGOS_PATH)/fw/skeleton/fs
+BOOTLOADER_PATH ?= $(COMMON_ESP_PATH)/rboot
+ESPTOOL2 = $(BUILD_DIR)/esptool2
+# Enable heap allocation logging - every malloc/free is logged.
+MGOS_ENABLE_HEAP_LOG ?= 0
+# In addition to logging allocations, print call traces for them.
+# This instruments every function and increases code size significantly.
+MGOS_ENABLE_CALL_TRACE ?= 0
+MGOS_ESP8266_RTOS ?= 0
+
+FLASH_SIZE ?= 4M
+FS_SIZE ?= 128K
+FS_BLOCK_SIZE = 4096
+FS_PAGE_SIZE = 256
+FS_ERASE_SIZE = 4096
+
+RF_CAL_DATA_SIZE = 0x1000
+SYS_PARAMS_SIZE = 0x4000
+
+FW_FILE_1_ADDR = 0
+FW_FILE_2_ADDR = 0x11000
+FW2_FILE_2_ADDR=$(shell printf "0x%08x" $$(($(FW_FILE_2_ADDR) + 0x100000)))
+
+BUILD_DIR ?= $(CURDIR)/.build
+FW_STAGING_DIR ?= $(BUILD_DIR)/fw_temp
+FW_DIR ?= $(CURDIR)/firmware
+GEN_DIR ?= $(BUILD_DIR)/gen
+
+# Absolutize all paths which can be given by the caller
+override BUILD_DIR := $(abspath $(BUILD_DIR))
+override FW_STAGING_DIR := $(abspath $(FW_STAGING_DIR))
+override FW_DIR := $(abspath $(FW_DIR))
+override GEN_DIR := $(abspath $(GEN_DIR))
+
+LWIP_BUILD_DIR = $(BUILD_DIR)/lwip
+
+FS_STAGING_DIR = $(BUILD_DIR)/fs
+RBOOT_FW_NAME = 0x00000.bin
+FW_SECTS = .text .data .rodata
+FW_USER_ARGS  = -quiet -bin -boot2
+
+# SSL can be None or mbedTLS
+SSL ?= mbedTLS
+
+include $(COMMON_ESP_PATH)/common.mk
+
+# For FW_VERSION, MG_FEATURES_TINY
+include $(MGOS_PATH)/fw/common.mk
+
+MGOS_ESP_SRC_PATH = $(MGOS_ESP_PATH)/src
+
+MGOS_SRCS = cs_file.c cs_rbuf.c \
+            mgos_config.c \
+            mgos_gpio.c \
+            mgos_init.c \
+            mgos_timers_mongoose.c \
+            mgos_wifi.c \
+            mgos_mongoose.c \
+            mgos_sys_config.c $(notdir $(SYS_CONFIG_C)) $(notdir $(SYS_RO_VARS_C)) \
+            mgos_uart.c \
+            mgos_utils.c \
+            mgos_dlsym.c \
+            cs_crc32.c \
+            rboot-bigflash.c rboot-api.c \
+            json_utils.c \
+            umm_malloc.c \
+            mongoose.c frozen.c
+MGOS_SRCS += $(notdir $(foreach m,$(MGOS_ESP_SRC_PATH) $(SPIFFS_PATH) $(COMMON_ESP_PATH),$(wildcard $(m)/*.c)))
+APP_SRCS := $(notdir $(foreach m,$(APP_MODULES),$(wildcard $(m)/*.c) $(wildcard $(m)/*.cpp))) $(APP_EXTRA_SRCS)
+
+MGOS_FEATURES ?=
+
+MGOS_ENABLE_I2C_GPIO = 1
+
+include $(MGOS_PATH)/fw/src/features.mk
+
+ifeq "$(MGOS_ENABLE_I2C)" "1"
+  SYS_CONF_SCHEMA += $(MGOS_ESP_SRC_PATH)/esp_i2c_config.yaml
+endif
+ifeq "$(MGOS_ENABLE_WIFI)" "1"
+  SYS_CONF_SCHEMA += $(MGOS_ESP_SRC_PATH)/esp_wifi_config.yaml
+endif
+
+VPATH = $(APP_MODULES) $(MGOS_SRC_PATH) $(MONGOOSE_PATH) \
+        $(FROZEN_PATH) $(UMM_MALLOC_PATH) \
+        $(BOOTLOADER_PATH)/rboot/appcode $(COMMON_PATH) $(COMMON_PATH)/mg_rpc \
+        $(MGOS_ESP_SRC_PATH) $(SPIFFS_PATH) $(COMMON_ESP_PATH)
+IPATH = $(APP_MODULES) $(MGOS_PATH) $(MGOS_ESP_PATH)/include $(SPIFFS_PATH) \
+        $(BOOTLOADER_PATH)/rboot $(SDK_PATH)/include/lwip \
+        $(SDK_PATH) $(SDK_PATH)/include \
+        $(COMMON_ESP_PATH) \
+        $(MGOS_ESP_SRC_PATH) $(COMMON_PATH)/mg_rpc .
+LPATH = $(SDK_PATH)/lib $(BUILD_DIR)/lwip $(MGOS_ESP_SRC_PATH)
+
+# libraries used in this project, mainly provided by the SDK
+SDK_LIBS = c crypto gcc hal pp phy net80211 wpa
+LIBS = $(addprefix -l,$(SDK_LIBS))
+
+SHIMS = -DNDEBUG
+
+MGOS_ESP_FEATURES =
+
+MINIZ_FLAGS = -DMINIZ_NO_STDIO -DMINIZ_NO_TIME -DMINIZ_NO_ARCHIVE_APIS \
+              -DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_APIS \
+              -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
+
+MG_FEATURES ?= $(MG_FEATURES_TINY) -DMG_ESP8266 -DMG_EXT_SHA1 \
+               -DMG_ENABLE_FILESYSTEM -DMG_ENABLE_DIRECTORY_LISTING \
+               -DMG_NET_IF=MG_NET_IF_LWIP_LOW_LEVEL -DMG_MODULE_LINES
+
+FEATURES_EXTRA ?=
+FEATURES = $(MG_FEATURES) $(MGOS_FEATURES) $(MGOS_ESP_FEATURES) \
+           $(FEATURES_EXTRA) \
+           -DCS_ENABLE_SPIFFS \
+           -DBOOT_BIG_FLASH -DCS_SPIFFS_ENABLE_VFS -DESP_UMM_ENABLE
+
+MEMORY_FLAGS = -DMBUF_SIZE_MULTIPLIER=1 -DFS_MAX_OPEN_FILES=5
+
+.PHONY: all clean
+
+MGOS_CFLAGS = -DMGOS_APP=\"$(APP)\" \
+              -DMGOS_MAX_NUM_UARTS=2 \
+              -DMGOS_NUM_GPIO=16 \
+              -DC_DISABLE_BUILTIN_SNPRINTF
+
+FS_IMG = $(FW_STAGING_DIR)/$(FS_ADDR).bin
+
+_FLASH_SIZE = $(shell echo $$((`echo $(FLASH_SIZE) | \
+   sed -e 's/K/*1024/;s/k/128/;s/M/*1048576/;s/m/*131072/'`)))
+_FS_SIZE = $(shell echo $$((`echo $(FS_SIZE) | \
+   sed -e 's/K/*1024/;s/k/128/;s/M/*1048576/;s/m/*131072/'`)))
+
+MGOS_LIB = $(BUILD_DIR)/mongoose-os.a
+SYS_CONFIG_C = $(GEN_DIR)/sys_config.c
+SYS_CONFIG_DEFAULTS_JSON = $(GEN_DIR)/sys_config_defaults.json
+SYS_CONFIG_SCHEMA_JSON = $(GEN_DIR)/sys_config_schema.json
+SYS_RO_VARS_C = $(GEN_DIR)/sys_ro_vars.c
+SYS_RO_VARS_SCHEMA_JSON = $(GEN_DIR)/sys_ro_vars_schema.json
+BUILD_INFO_C = $(GEN_DIR)/build_info.c
+BUILD_INFO_O = $(BUILD_DIR)/build_info.c.o
+BUILD_INFO_JSON = $(GEN_DIR)/build_info.json
+MG_BUILD_INFO_C = $(GEN_DIR)/mg_build_info.c
+MG_BUILD_INFO_O = $(BUILD_DIR)/mg_build_info.c.o
+SYMBOLS_DUMP = $(GEN_DIR)/symbols_dump.txt
+FFI_EXPORTS_C = $(GEN_DIR)/ffi_exports.c
+FFI_EXPORTS_O = $(BUILD_DIR)/ffi_exports.c.o
+GENFILES_FLAG = $(BUILD_DIR)/genfiles.done
+GENFILES_LIST = $(LD_SCRIPT) $(SYS_CONFIG_C) $(SYS_RO_VARS_C)
+FW_FILE_1_OUT = $(FW_STAGING_DIR)/$(shell printf "0x%05x.bin" $(FW_FILE_1_ADDR))
+FW_FILE_2_OUT = $(FW_STAGING_DIR)/$(shell printf "0x%05x.bin" $(FW_FILE_2_ADDR))
+IMAGE_HEADER_SIZE = 0
+
+ifeq "$(MGOS_ESP8266_RTOS)" "1"
+	SDK_PATH = /opt/Espressif/ESP8266_RTOS_SDK
+  MGOS_CFLAGS += -DRTOS_SDK
+	LWIP_LIB =
+  LWIP_PATH = $(SDK_PATH)/lwip
+	SDK_LIBS += freertos lwip main mirom
+  IPATH += $(SDK_PATH)/include/espressif \
+           $(SDK_PATH)/extra_include \
+           $(SDK_PATH)/include/lwip/ipv4 \
+           $(SDK_PATH)/include/lwip/ipv6
+	LD_SCRIPT_TEMPL = $(MGOS_ESP_PATH)/ld/rtos.ld
+else
+	SDK_PATH = /opt/Espressif/ESP8266_NONOS_SDK
+	MGOS_CFLAGS += -DLWIP_OPEN_SRC -DESP_COREDUMP
+	LWIP_LIB = $(LWIP_BUILD_DIR)/liblwip_cs.a
+	LWIP_PATH = $(COMMON_ESP_PATH)/lwip
+	SDK_LIBS += m main_ota
+	IPATH += $(LWIP_PATH)/src/include \
+           $(LWIP_PATH)/src/include/ipv4 \
+           $(LWIP_PATH)/espressif/include
+  LD_SCRIPT_TEMPL = $(MGOS_ESP_PATH)/ld/non_os.ld
+
+$(LWIP_LIB): $(LWIP_PATH)
+	$(Q) $(MAKE) -C $(LWIP_PATH) -j3 all \
+	  APP=liblwip_cs BUILD_DIR=$(abspath $(LWIP_BUILD_DIR)) \
+	  CFLAGS_EXTRA="$(HEAP_LOG_FLAGS)"
+endif
+
+ifeq "$(SSL)" "mbedTLS"
+  IPATH += $(MBEDTLS_PATH)/include
+  MGOS_SRCS += esp_crypto.c
+  MGOS_ESP_FEATURES += -DMG_ENABLE_SSL -DMG_SSL_IF=MG_SSL_IF_MBEDTLS -DMG_SSL_IF_MBEDTLS_FREE_CERTS
+  MBEDTLS_CFLAGS = $(CFLAGS) -Wno-unused-variable -Wno-unused-function
+  SYS_CONF_SCHEMA += $(MGOS_ESP_SRC_PATH)/esp_mbedtls_config.yaml
+  ifeq "$(MGOS_ENABLE_ATCA)" "1"
+    MBEDTLS_CFLAGS += -DMBEDTLS_ECP_ATCA -I$(ATCA_PATH)/lib
+    SSL_LIBS = $(addprefix $(MBEDTLS_PATH)/library/,libmbedcrypto_atca.a libmbedtls_atca.a libmbedx509.a)
+	else
+    SSL_LIBS = $(addprefix $(MBEDTLS_PATH)/library/,libmbedcrypto.a libmbedtls.a libmbedx509.a)
+  endif
+
+$(SSL_LIBS):
+	$(Q) $(MAKE) -j4 -C $(MBEDTLS_PATH)/library $(notdir $@) \
+	  CC=$(CC) AR=$(AR) \
+	  CFLAGS="$(MBEDTLS_CFLAGS)"
+	$(Q) $(OBJCOPY) --rename-section .rodata=.irom0.text $@
+	$(Q) $(OBJCOPY) --rename-section .rodata.str1.1=.irom0.text $@
+else
+  SSL_LIBS =
+endif
+
+include $(MGOS_PATH)/fw/src/spiffs.mk
+
+MGOS_OBJS = $(addprefix $(BUILD_DIR)/,$(MGOS_SRCS:=.o)) $(BUILD_DIR)/lse_handler.S.o
+APP_OBJS = $(addprefix $(BUILD_DIR)/,$(APP_SRCS:=.o))
+
+APP_BIN = $(BUILD_DIR)/$(APP).bin
+APP_ELF = $(BUILD_DIR)/$(APP).elf
+LD_SCRIPT = $(GEN_DIR)/$(FW_FILE_2_ADDR).ld
+LD_WRAPPERS =
+HEAP_LOG_FLAGS =
+
+ifneq "${MGOS_ENABLE_HEAP_LOG}${MGOS_ENABLE_CALL_TRACE}" "00"
+  HEAP_LOG_FLAGS += -DMGOS_ENABLE_HEAP_LOG
+  LD_WRAPPERS += -Wl,--wrap=pvPortCalloc \
+                 -Wl,--wrap=pvPortMalloc \
+                 -Wl,--wrap=pvPortZalloc \
+                 -Wl,--wrap=pvPortRealloc \
+                 -Wl,--wrap=vPortFree
+endif
+ifeq "${MGOS_ENABLE_CALL_TRACE}" "1"
+  MGOS_SRCS += cs_heap_trace.c
+  HEAP_LOG_FLAGS += -finstrument-functions -DCALL_TRACE_SIZE=33 -DMGOS_ENABLE_CALL_TRACE
+endif
+
+IMAGE_HEADER_SIZE = 0x10
+ROM_SIZE = $(shell printf "0x%05x" "$$((0x100000 - $(FW_FILE_2_ADDR) - $(_FS_SIZE) - $(RF_CAL_DATA_SIZE) - $(SYS_PARAMS_SIZE) - $(IMAGE_HEADER_SIZE)))")
+FW_RF_CAL_DATA_ADDR = $(shell printf "0x%05x" "$$((0x100000 - $(RF_CAL_DATA_SIZE) - $(SYS_PARAMS_SIZE)))")
+FS_ADDR  = $(shell printf "0x%05x" "$$((0x100000 - $(_FS_SIZE) - $(RF_CAL_DATA_SIZE) - $(SYS_PARAMS_SIZE)))")
+FS2_ADDR = $(shell printf "0x%05x" "$$((0x200000 - $(_FS_SIZE) - $(RF_CAL_DATA_SIZE) - $(SYS_PARAMS_SIZE)))")
+SYS_PARAMS_ADDR = $(shell printf "0x%05x" "$$(($(_FLASH_SIZE) - $(SYS_PARAMS_SIZE)))")
+RBOOT_CFG_INIT=$(FW_STAGING_DIR)/0x01000.bin
+RF_CAL_DATA_INIT=$(FW_STAGING_DIR)/$(FW_RF_CAL_DATA_ADDR).bin
+PREREQ = rboot $(RBOOT_CFG_INIT)
+BOOTLOADER_FLAGS = -DFW1_ADDR=$(FW_FILE_2_ADDR) \
+                   -DFW2_ADDR=$(FW2_FILE_2_ADDR) \
+                   -DFW1_FS_ADDR=$(FS_ADDR) \
+                   -DFW2_FS_ADDR=$(FS2_ADDR) \
+                   -DFS_SIZE=$(_FS_SIZE) \
+                   -DFW_SIZE=$(ROM_SIZE)
+
+FW_MANIFEST = $(FW_STAGING_DIR)/manifest.json
+
+INCDIRS = $(addprefix -I,$(IPATH)) -I$(GEN_DIR)
+LIBDIRS = $(addprefix -L,$(LPATH))
+
+CFLAGS += $(MEMORY_FLAGS) $(SHIMS) $(FEATURES) \
+          -DFW_RF_CAL_DATA_ADDR=$(FW_RF_CAL_DATA_ADDR) \
+          -DFW_ARCHITECTURE=$(APP_PLATFORM) \
+          $(MGOS_CFLAGS) $(APP_CFLAGS) $(CFLAGS_EXTRA) \
+          $(HEAP_LOG_FLAGS) $(MINIZ_FLAGS) $(BOOTLOADER_FLAGS)
+
+$(BUILD_DIR) $(FW_DIR) $(FW_STAGING_DIR) $(GEN_DIR):
+	$(vecho) "MKDIR $@"
+	$(Q) mkdir -p $@
+
+# Main output product: firmware files.
+FW_PARTS = boot:src=$(FW_FILE_1_OUT),addr=0 \
+           boot_cfg:src=$(RBOOT_CFG_INIT),addr=0x1000 \
+           rf_cal_data:src=$(RF_CAL_DATA_INIT),addr=$(FW_RF_CAL_DATA_ADDR) \
+           fw:src=$(FW_FILE_2_OUT),addr=$(FW_FILE_2_ADDR) \
+           sys_params:type=sys_params,src=$(SDK_PATH)/bin/esp_init_data_default.bin,addr=$(SYS_PARAMS_ADDR) \
+           fs:src=$(FS_IMG),type=fs,addr=$(FS_ADDR),fs_size=$(_FS_SIZE),fs_block_size=$(FS_BLOCK_SIZE),fs_page_size=$(FS_PAGE_SIZE),fs_erase_size=$(FS_ERASE_SIZE)
+
+include $(MGOS_PATH)/common/scripts/fw_meta.mk
+
+all: $(FW_DIR) $(BUILD_DIR) $(GEN_DIR) $(FW_STAGING_DIR) $(PREREQ) $(FW_ZIP)
+
+$(FW_MANIFEST): $(FW_FILE_1_OUT) $(RBOOT_CFG_INIT) $(RF_CAL_DATA_INIT) \
+                $(FW_FILE_2_OUT) $(FS_IMG) $(FS_FILES)
+
+$(RBOOT_CFG_INIT) $(RF_CAL_DATA_INIT): $(FW_STAGING_DIR)
+	$(vecho) "GEN   $@"
+	$(Q) dd if=/dev/zero ibs=1 count=4096 | tr "\000" "\377" > $@
+
+$(FW_FILE_1_OUT): $(BUILD_DIR)/rboot.bin
+	$(vecho) "CP    $< -> $@"
+	$(Q) cp $< $@
+
+$(FW_FILE_2_OUT): $(APP_BIN)
+	$(vecho) "CP    $< -> $@"
+	$(Q) cp $< $@
+
+$(APP_BIN): $(APP_ELF)
+	$(vecho) "FW    $< -> $@"
+	$(Q) $(ESPTOOL2) $(FW_USER_ARGS) $< $@ $(FW_SECTS)
+
+# -- Linking.
+
+# Link the main ELF output file.
+$(APP_ELF): $(APP_OBJS) $(FFI_EXPORTS_O) $(BUILD_INFO_O) $(MG_BUILD_INFO_O) $(MGOS_LIB) $(ATCA_LIB) $(LWIP_LIB) $(SSL_LIBS) $(LD_SCRIPT)
+	# Before linking, rename .rodata section in APP_OBJS.
+	#
+	# We can't build a library APP_LIB and rename section there, because for
+	# some weird reason mgos_app_init() from that lib can't override a weak symbol
+	# from MGOS_LIB.
+	for i in $(APP_OBJS); do \
+	  $(OBJCOPY) --rename-section .rodata=.irom0.text $$i; \
+	  $(OBJCOPY) --rename-section .rodata.str1.1=.irom0.text $$i; \
+	done
+ifeq "$(MGOS_ESP8266_RTOS)" "1"
+	$(OBJCOPY) --weaken-symbol printf /opt/Espressif/esp-open-sdk/xtensa-lx106-elf/xtensa-lx106-elf/lib/libc.a
+endif
+	$(call link,$(APP_OBJS) $(MG_BUILD_INFO_O) $(FFI_EXPORTS_O) $(BUILD_INFO_O) $(MGOS_LIB) $(ATCA_LIB) $(LWIP_LIB) $(SSL_LIBS) $(LIBS) $(LD_WRAPPERS))
+
+$(BUILD_DIR)/dummy_main.c: $(APP_OBJS) $(MGOS_ESP_PATH)/Makefile.build
+	$(vecho) "GEN   $@"
+	$(Q) echo "void user_init(void){}; " \
+            "void system_restart_local(){};" \
+            "void __wrap_user_fatal_exception_handler(){}; " \
+            "void __cyg_profile_func_enter(void *this_fn, void *call_site){(void) this_fn; (void) call_site;}" \
+            "void __cyg_profile_func_exit(void *this_fn, void *call_site){(void) this_fn; (void) call_site;}" > $@
+
+# Main app lib.
+$(MGOS_LIB): $(MGOS_OBJS)
+	$(vecho) "AR    $@"
+	$(Q) $(AR) cru $@ $^
+	$(Q) $(OBJCOPY) --rename-section .rodata=.irom0.text $@
+	$(Q) $(OBJCOPY) --rename-section .rodata.str1.1=.irom0.text $@
+
+# This rule is for normal (pre-existing) C sources from VPATH.
+$(BUILD_DIR)/%.c.o: %.c $(GENFILES_FLAG)
+	$(compile)
+
+# This rule is for normal (pre-existing) C++ sources from VPATH.
+$(BUILD_DIR)/%.cpp.o: %.cpp $(GENFILES_FLAG)
+	$(compile_cxx)
+
+# Assembly sources.
+$(BUILD_DIR)/%.S.o: %.S $(GENFILES_FLAG)
+	$(vecho) "AS    $< -> $@"
+	$(Q) $(CC) -c -mtext-section-literals -o $@ $<
+
+# This one is for generated sources in build/gen directory.
+$(BUILD_DIR)/%.c.o: $(GEN_DIR)/%.c $(GENFILES_FLAG)
+	$(compile)
+
+# Common gathering point for all generated files.
+# Except build info, which is special because it depends on objects.
+$(GENFILES_FLAG): $(GENFILES_LIST)
+	$(Q) touch $@
+
+# Generate linker script.
+$(LD_SCRIPT): $(LD_SCRIPT_TEMPL)
+	$(eval _IROM0ADDR=$(shell printf "0x%08x" $$((0x40200000 + $(basename $(notdir $@)) + $(IMAGE_HEADER_SIZE)))))
+	$(eval _IROM0SIZE=$(ROM_SIZE))
+	$(vecho) "GEN   $^ ($(_IROM0SIZE) @ $(_IROM0ADDR)) -> $@"
+	$(Q) mkdir -p $(GEN_DIR)
+	$(Q) sed -e 's/_IROM0ADDR/$(_IROM0ADDR)/; s/_IROM0SIZE/$(_IROM0SIZE)/' $^ > $@
+
+include $(MGOS_PATH)/common/scripts/build_info.mk
+include $(MGOS_PATH)/common/scripts/ffi_exports.mk
+include $(MGOS_PATH)/fw/src/sys_config.mk
+
+SYS_CONF_SCHEMA += $(MGOS_ESP_SRC_PATH)/esp_sys_config.yaml
+
+$(SYMBOLS_DUMP): $(APP_OBJS) $(MGOS_OBJS)
+	$(vecho) "GEN   $@"
+	$(Q) $(NM) --defined-only --print-file-name -g $^ > $@
+
+$(FFI_EXPORTS_C): $(SYMBOLS_DUMP)
+	$(call gen_ffi_exports,$<,$@,$(FFI_SYMBOLS))
+
+# In ffi exports file we use fake signatures: void func(void), and it conflicts
+# with the builtin functions like fopen, etc.
+$(FFI_EXPORTS_O): CFLAGS += -fno-builtin
+
+# Regenerate build info if there are changes in objects.
+$(BUILD_INFO_C) $(BUILD_INFO_JSON): $(APP_OBJS) $(MGOS_OBJS)
+	$(call gen_build_info,$@,,$(APP_BUILD_ID),$(APP_VERSION),,$(BUILD_INFO_C),$(BUILD_INFO_JSON))
+
+$(MG_BUILD_INFO_C): $(MGOS_OBJS)
+	$(call gen_build_info,$@,$(MGOS_PATH)/fw,,,mg_,$(MG_BUILD_INFO_C),)
+
+# Pull in auto-generated .c dependencies (if any).
+-include $(wildcard $(BUILD_DIR)/*.d)
+
+# -- Filesystem.
+
+$(FS_IMG): $(APP_FS_PATH) $(COMMON_FS_PATH) $(FS_FILES) $(SYS_CONFIG_C) $(SYS_RO_VARS_C)
+	$(call mkspiffs,$(_FS_SIZE))
+
+#
+# Auxiliary targets.
+#
+
+rboot: $(BUILD_DIR)/esptool2 $(BUILD_DIR)/rboot.bin $(FW_STAGING_DIR)/$(RBOOT_FW_NAME)
+
+$(ESPTOOL2):
+	$(Q) $(MAKE) --no-print-directory -C $(BOOTLOADER_PATH)/esptool2 BUILD_DIR=$(abspath $(BUILD_DIR))
+
+$(BUILD_DIR)/rboot.bin: $(ESPTOOL2)
+	$(Q) $(MAKE) --no-print-directory -C $(BOOTLOADER_PATH)/rboot -f rboot.mk \
+	  RBOOT_BUILD_BASE=$(abspath $(BUILD_DIR)) \
+	  RBOOT_GEN_BASE=$(abspath $(GEN_DIR)) \
+	  ESPTOOL2=$(abspath $(ESPTOOL2)) SDK_BASE=$(SDK_PATH) \
+	  RBOOT_BIG_FLASH=1 CFLAGS_EXTRA="$(BOOTLOADER_FLAGS)"
+
+clean:
+	$(Q) rm -rf $(BUILD_DIR) $(FW_DIR)
+ifeq "$(SSL)" "mbedTLS"
+	$(Q) $(MAKE) -C $(MBEDTLS_PATH)/library clean
+endif

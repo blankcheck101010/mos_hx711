@@ -1,0 +1,18 @@
+[
+  ["mqtt", "o", {title: "MQTT settings"}],
+  ["mqtt.server", "s", "test.mosquitto.org:1883", {title: "MQTT server"}],
+  ["mqtt.user", "s", "", {title: "User name"}],
+  ["mqtt.pass", "s", "", {title: "Password"}],
+  ["mqtt.reconnect_timeout_min", "i", 10, {title: "Starting reconnect timeout"}],
+  ["mqtt.reconnect_timeout_max", "i", 60, {title: "Maximum reconnect timeout"}],
+  ["mqtt.ssl_cert", "s", "", {title: "Client certificate to present to the server"}],
+  ["mqtt.ssl_key", "s", "", {title: "Private key corresponding to the certificate"}],
+  ["mqtt.ssl_ca_cert", "s", "", {title: "Verify server certificate using this CA bundle"}],
+  ["mqtt.ssl_cipher_suites", "s", "", {title: "Cipher suites to offer to the server"}],
+  ["mqtt.ssl_psk_identity", "s", "", {title: "PSK identity (must specify PSK cipher suites)"}],
+  ["mqtt.ssl_psk_key", "s", "", {title: "PSK key"}],
+  ["mqtt.clean_session", "b", true, {title: "Clean Session"}],
+  ["mqtt.keep_alive", "i", 60, {title: "Keep alive interval"}],
+  ["mqtt.will_topic", "s", "", {title: "Will topic"}],
+  ["mqtt.will_message", "s", "", {title: "Will message"}],
+]

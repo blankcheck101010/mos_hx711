@@ -1,0 +1,230 @@
+.PHONY: all clean
+.DEFAULT_GOAL := all
+
+MGOS_ENABLE_ATCA ?= 0
+MGOS_ENABLE_ATCA_SERVICE ?= 0
+MGOS_ENABLE_CONSOLE ?= 0
+MGOS_ENABLE_UPDATER ?= 0
+MGOS_ENABLE_UPDATER_POST ?= 0
+MGOS_ENABLE_UPDATER_RPC ?= 0
+
+CREATE_SPIFFS_FS ?= 1
+USE_LWIP ?= 1
+
+include $(MGOS_PATH)/fw/src/features.mk
+
+TARGET ?=
+
+ifeq "${TARGET}" ""
+$(error Please, specify TARGET. Possible values are NUCLEO-F746ZG or DISCO-F746G)
+endif
+
+APP ?= mongoose-os
+APP_PLATFORM = stm32
+APP_MODULES ?=
+APP_CFLAGS ?=
+APP_FS_PATH ?=
+APP_EXTRA_SRCS ?=
+FFI_SYMBOLS ?=
+
+MGOS_PATH ?= ../../..
+COMMON_PATH ?= $(MGOS_PATH)/common
+MONGOOSE_PATH ?= $(MGOS_PATH)/mongoose
+FROZEN_PATH ?= $(MGOS_PATH)/frozen
+MGOS_SRC_PATH ?= $(MGOS_PATH)/fw/src
+MGOS_PLATFORM_PATH ?= $(MGOS_PATH)/fw/platforms/stm32
+MGOS_FEATURES ?=
+
+# Normal (docker) version
+PLATFORM_SDK_ROOT ?= /opt/stm32-sdks/
+# Debug (local) version
+# PLATFORM_SDK_ROOT ?= $(MGOS_PATH)/docker/stm32/stm32-sdks/
+
+PLATFORM_SDK_PATH = ${PLATFORM_SDK_ROOT}/${TARGET}
+
+ifeq "$(wildcard $(PLATFORM_SDK_PATH))" ""
+$(error Invalid TARGET. Possible values are NUCLEO-F746ZG or DISCO-F746G)
+endif
+
+PLATFORM_CFLAGS = $(shell cat $(PLATFORM_SDK_PATH)/cflags)
+
+CC = arm-none-eabi-gcc
+OBJCOPY = arm-none-eabi-objcopy
+NM = arm-none-eabi-nm
+
+BUILD_DIR ?= $(CURDIR)/.build
+FW_STAGING_DIR ?= $(BUILD_DIR)/fw_temp
+FW_DIR ?= $(CURDIR)/fw
+GEN_DIR ?= $(BUILD_DIR)/gen
+
+# Absolutize all paths which can be given by the caller
+override BUILD_DIR := $(abspath $(BUILD_DIR))
+override FW_STAGING_DIR := $(abspath $(FW_STAGING_DIR))
+override FW_DIR := $(abspath $(FW_DIR))
+override GEN_DIR := $(abspath $(GEN_DIR))
+override BUILD_DIR := $(abspath $(BUILD_DIR))
+
+include $(MGOS_PATH)/fw/common.mk
+
+SDK_SRCS = $(shell find $(PLATFORM_SDK_PATH)/STM -name '*.[cs]')
+SDK_INCLUDES = $(shell find $(PLATFORM_SDK_PATH)/STM -type d)
+LDSCRIPT = $(shell find $(PLATFORM_SDK_PATH)/STM -name '*.ld')
+
+# Platform support files
+ADD_SRCS = stm32_mgos_main.c stm32_gpio.c stm32_hal.c stm32_uart.c \
+           stm32_libc.c stm32_wifi.c stm32_fs.c stm32_i2c.c \
+           stm32_lwip.c
+
+# Additional files from SDK
+ADD_SRCS += stm32_gpio_defs.c
+
+APP_ELF = $(BUILD_DIR)/$(APP).elf
+APP_BIN = $(BUILD_DIR)/$(APP).bin
+SPIFFS_PATH ?= $(COMMON_PATH)/spiffs
+COMMON_FS_PATH ?= $(MGOS_PATH)/fw/skeleton/fs
+FS_IMG = ?
+# 256K is minimum size, because sector size is 128K and we need at least two
+FS_SIZE = 262144
+FS_HEADER=$(GEN_DIR)/fs_data.h
+FS_STAGING_DIR = $(BUILD_DIR)/fs
+# Let's have FS in sectors 6 & 7 (seems all STM boards have 7 sectors)
+# TODO(alashkin): uncomment line below to allow spiffs writing
+FS_ATTRIBUTES = '__attribute__((section(".rodata.__at_0x08040000"))) __attribute__ ((aligned (131072)))'
+
+ifeq "${CREATE_SPIFFS_FS}" "1"
+  FS_IMG = $(FW_STAGING_DIR)/fs.bin
+endif
+
+include $(MGOS_PATH)/fw/src/spiffs.mk
+
+BUILD_INFO_C = $(GEN_DIR)/build_info.c
+BUILD_INFO_JSON = $(GEN_DIR)/build_info.json
+MG_BUILD_INFO_C = $(GEN_DIR)/mg_build_info.c
+SYS_CONFIG_C = $(GEN_DIR)/sys_config.c
+SYS_CONFIG_DEFAULTS_JSON = $(GEN_DIR)/sys_config_defaults.json
+SYS_CONFIG_SCHEMA_JSON = $(GEN_DIR)/sys_config_schema.json
+SYS_RO_VARS_C = $(GEN_DIR)/sys_ro_vars.c
+SYS_RO_VARS_SCHEMA_JSON = $(GEN_DIR)/sys_ro_vars_schema.json
+GENFILES_FLAG = $(BUILD_DIR)/genfiles.done
+GENFILES_LIST = $(SYS_CONFIG_C) $(SYS_RO_VARS_C) $(BUILD_INFO_C) $(MG_BUILD_INFO_C) $(FS_HEADER)
+SYMBOLS_DUMP = $(GEN_DIR)/symbols_dump.txt
+FFI_EXPORTS_C = $(GEN_DIR)/ffi_exports.c
+FFI_EXPORTS_O = $(BUILD_DIR)/ffi_exports.c.o
+SRCS = $(SDK_SRCS) $(ADD_SRCS) $(APP_SRCS) $(MGOS_SRCS)
+
+MGOS_SRCS +=  $(notdir $(SYS_CONFIG_C)) $(notdir $(SYS_RO_VARS_C)) \
+			 $(notdir $(MG_BUILD_INFO_C)) $(notdir $(BUILD_INFO_C)) \
+             mgos_gpio.c mgos_sys_config.c mgos_config.c mongoose.c \
+             mgos_timers_mongoose.c cs_file.c mgos_mongoose.c \
+             json_utils.c frozen.c mgos_uart.c cs_rbuf.c mgos_init.c \
+             cs_dbg.c mgos_dlsym.c mgos_utils.c
+
+MGOS_SRCS += $(notdir $(foreach m, $(SPIFFS_PATH),$(wildcard $(m)/*.c)))
+
+APP_SRCS := $(notdir $(foreach m,$(APP_MODULES),$(wildcard $(m)/*.c))) $(APP_EXTRA_SRCS)
+
+VPATH += $(MGOS_PATH)/fw/platforms/stm32 $(GEN_DIR) $(APP_MODULES) \
+         $(MGOS_SRC_PATH) $(MONGOOSE_PATH) $(COMMON_PATH) $(FROZEN_PATH) \
+         $(SPIFFS_PATH) $(COMMON_PATH)/mg_rpc $(PLATFORM_SDK_PATH)/CS/extras
+
+FW_PARTS = boot:src=$(APP_BIN),addr=0
+
+include $(MGOS_PATH)/common/scripts/fw_meta.mk
+
+OBJECTS := $(addprefix $(BUILD_DIR)/,$(SRCS:=.o))
+CFLAGS ?= -DSTM32 -Os -fno-common -ffunction-sections -fdata-sections \
+          $(PLATFORM_CFLAGS) $(MGOS_FEATURES) \
+          -DMGOS_MAX_NUM_UARTS=2 -DFS_SIZE=${FS_SIZE} \
+          -Wall -Werror ${MG_FEATURES_TINY} -DMG_ENABLE_DIRECTORY_LISTING
+
+LDFLAGS ?=
+
+LDLIBS = -Wl,--start-group
+
+ifeq "${USE_LWIP}" "1"
+CFLAGS += -DMG_NET_IF=3 -D__CPU_H__ -DMG_LWIP=1 -DLWIP_TIMEVAL_PRIVATE=0 \
+          -DLWIP_TCP_KEEPALIVE=1 -DMG_SSL_IF=MG_SSL_IF_MBEDTLS \
+          -DMGOS_APP=\"$(APP)\" -DMG_ENABLE_SSL
+LDFLAGS += -L$(PLATFORM_SDK_PATH)/CS/mbedtls/library
+LDLIBS += -lmbedcrypto -lmbedtls -lmbedx509
+endif
+
+LDLIBS += -lc -lgcc -lnosys -Wl,--end-group
+
+IPATH += $(addprefix -I, $(SDK_INCLUDES) $(APP_MODULES))
+IPATH += -I$(MGOS_PATH) -I$(GEN_DIR) -I$(PLATFORM_SDK_PATH) \
+		 -I$(SPIFFS_PATH) -I$(MGOS_PLATFORM_PATH) \
+		 -I$(PLATFORM_SDK_PATH)/CS/mbedtls/include \
+		 -I$(PLATFORM_SDK_PATH)/CS/extras
+
+all: $(BUILD_DIR) $(FW_STAGING_DIR) $(FW_DIR) $(GEN_DIR) $(APP_BIN) $(FW_ZIP)
+
+$(FW_MANIFEST): $(APP_BIN) $(SYS_CONFIG_C) $(BUILD_INFO_C) $(BUILD_INFO_JSON) $(MG_BUILD_INFO_C) $(FW_DIR)
+
+$(BUILD_DIR) $(FW_STAGING_DIR) $(FW_DIR) $(GEN_DIR):
+	$(vecho) MKDIR $@
+	$(Q) mkdir -p $@
+
+$(BUILD_DIR)/%.c.o: %.c $(BUILD_DIR) $(GENFILES_FLAG)
+	$(vecho) CC $(notdir $<)
+	$(Q) mkdir -p $(basename $@)
+	$(Q) $(CC) $(CFLAGS) $(IPATH) -c $< -o $@
+
+$(BUILD_DIR)/%.s.o: %.s $(BUILD_DIR) $(GENFILES_FLAG)
+	$(vecho) CC $(notdir $<)
+	$(Q) mkdir -p $(basename $@)
+	$(Q) $(CC) $(CFLAGS) $(IPATH) -c $< -o $@
+
+$(BUILD_DIR)/%.c.o: $(GEN_DIR)/%.c $(GENFILES_FLAG)
+	$(vecho) CC $(notdir $<)
+	$(Q) mkdir -p $(basename $@)
+	$(Q) $(CC) $(CFLAGS) $(IPATH) -c $< -o $@
+
+$(GENFILES_FLAG): $(GENFILES_LIST)
+	$(Q) touch $@
+
+$(APP_ELF): $(OBJECTS) $(FFI_EXPORTS_O)
+	$(vecho) LD $(notdir $@)
+	$(Q) $(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(FFI_EXPORTS_O) $(LDLIBS) -T$(LDSCRIPT) -o $@
+
+$(APP_BIN): $(APP_ELF)
+	$(vecho) OBJCOPY $(notdir $@)
+	$(Q) $(OBJCOPY) -Obinary $^ $@
+
+include $(MGOS_PATH)/common/scripts/build_info.mk
+include $(MGOS_PATH)/common/scripts/ffi_exports.mk
+include $(MGOS_PATH)/fw/src/sys_config.mk
+
+SYS_CONF_SCHEMA += $(MGOS_PLATFORM_PATH)/stm32_config.yaml
+
+$(BUILD_INFO_C) $(BUILD_INFO_JSON): $(FW_STAGING_DIR)
+	$(call gen_build_info,$@,,$(APP_BUILD_ID),$(APP_VERSION),,$(BUILD_INFO_C),$(BUILD_INFO_JSON))
+
+$(MG_BUILD_INFO_C): $(FW_STAGING_DIR)
+	$(call gen_build_info,$@,$(MGOS_PATH)/fw,,,mg_,$(MG_BUILD_INFO_C),)
+
+# Pull in auto-generated .c dependencies (if any).
+-include $(wildcard $(BUILD_DIR)/*.d)
+
+$(FS_IMG): $(APP_FS_PATH) $(COMMON_FS_PATH) $(FS_FILES) $(SYS_CONFIG_C) $(SYS_RO_VARS_C)
+	$(call mkspiffs,$(FS_SIZE))
+
+$(FS_HEADER) : $(FS_IMG)
+	$(vecho) Preparing FS
+	$(Q) (cd $(dir $(FS_IMG)) && xxd -i  $(notdir $(FS_IMG)) $(FS_HEADER).tmp && \
+	      echo $(FS_ATTRIBUTES) > $(FS_HEADER) && \
+		  cat  $(FS_HEADER).tmp >> $(FS_HEADER))
+
+$(SYMBOLS_DUMP): $(OBJECTS)
+	$(vecho) "GEN   $@"
+	$(Q) $(NM) --defined-only --print-file-name -g $^ > $@
+
+$(FFI_EXPORTS_C): $(SYMBOLS_DUMP)
+	$(call gen_ffi_exports,$<,$@,$(FFI_SYMBOLS))
+
+# In ffi exports file we use fake signatures: void func(void), and it conflicts
+# with the builtin functions like fopen, etc.
+$(FFI_EXPORTS_O): CFLAGS += -fno-builtin
+
+clean:
+	@rm -rf $(BUILD_DIR)
